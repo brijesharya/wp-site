@@ -1,0 +1,58 @@
+version: '3.7'
+services:
+  db:
+    image: mysql:5.7
+    volumes:
+      - ./db_data/mysql:/var/lib/mysql
+    restart: always
+    env_file:
+      ./env/.env
+    networks:
+       - overlay
+  wp:
+    image: wordpress:5-fpm
+    volumes:
+       - ./php-uploads.ini:/usr/local/etc/php/conf.d/uploads.ini
+       - ./site/wp:/var/www/html
+    env_file:
+      ./env/.wp-env
+    depends_on:
+      - db
+    restart: always
+    networks:
+      - overlay
+  nginx:
+    image: nginx
+    depends_on:
+      - wp
+    volumes:
+      - ./site/wp:/var/www/html
+      - ./nginx/conf.d:/etc/nginx/conf.d
+      - ./nginx/ssl:/etc/nginx/ssl
+      - ./certbot-etc:/etc/letsencrypt
+      - ./logs/nginx:/var/log/nginx
+    ports:
+      - "80:80"
+      - "443:443"
+    restart: always
+    networks:
+      - overlay
+  certbot:
+    depends_on:
+      - nginx
+    image: certbot/certbot
+    volumes:
+      - ./certbot-etc:/etc/letsencrypt
+      - ./site/wp:/var/www/html
+      - ./logs/certbot:/var/log
+### Un-comment below line after testing for actual certificate generation
+#    command: certonly --webroot --webroot-path=/var/www/html --email youremail@abc.com --agree-tos --no-eff-email -d www.example1.com
+### comment below line after initial testing
+    command: certonly --webroot --staging --webroot-path=/var/www/html --email youremail@abc.com --agree-tos --no-eff-email -d www.example1.com
+### Un-comment below line after actual cert generation for renewal
+#    command: renew --dry-run
+    networks:
+      - overlay
+
+networks:
+  overlay:
